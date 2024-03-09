@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
 import multiprocessing
 
-from reportInfo import ReportInfo
-from repeatedTimer import RepeatedTimer
+from .reportInfo import ReportInfo
+from .repeatedTimer import RepeatedTimer
 import numpy as np
 import argparse
 import torch
@@ -19,11 +19,11 @@ import time
 import pyximport
 
 pyximport.install(setup_args={'include_dirs':np.get_include()}, inplace=True, reload_support=True)
-from galechurch import gale_church
-from greedy import greedy_anchor_selection, get_highest_labse_anchor, greedy_anchor_selection_large
-from anchoring import calculate_anchor_nomatrix_set, calculate_anchor_set
-from utilities import create_labse_score_matrix, loc_start_end_matrices
-from align_anchors import align_anchors_multi
+from .galechurch import gale_church
+from .greedy import greedy_anchor_selection, get_highest_labse_anchor, greedy_anchor_selection_large
+from .anchoring import calculate_anchor_nomatrix_set, calculate_anchor_set
+from .utilities import create_labse_score_matrix, loc_start_end_matrices
+from .align_anchors import align_anchors_multi
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

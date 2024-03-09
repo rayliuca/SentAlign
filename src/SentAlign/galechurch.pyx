@@ -11,7 +11,7 @@ from libc.math cimport log, exp, sqrt, isinf
 
 from os import remove
 from os.path import basename
-from file_read_back import FileReadBackwards
+from .file_read_back import FileReadBackwards
 import tempfile
 
 cdef long score_cutoff

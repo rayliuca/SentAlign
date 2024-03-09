@@ -10,7 +10,7 @@ cimport cython
 import io
 import os
 
-from buffer_work_space import BufferWorkSpace
+from .buffer_work_space import BufferWorkSpace
 
 supported_encodings = ["utf-8", "ascii", "latin-1"]  # any encodings that are backward compatible with ascii should work
 

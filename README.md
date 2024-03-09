@@ -19,7 +19,7 @@ cd SentAlign
 
 The environment can be built using the provided environment.yml file:
 ```bash
-conda env create -f environment.yml
+mamba env create -f environment.yml
 ```
 
 ### Running the aligner
@@ -34,7 +34,7 @@ We assume that the documents to be aligned have the same names in the source and
 
 Assuming a Conda environment has been built as described above, the environment has to be activated before SentAlign is run:
 ```bash
-conda activate SentAlign
+mamba activate SentAlign
 ```
 
 Start by creating a list of files to align:
@@ -73,9 +73,10 @@ The SentAlign paper evaluates the aligner on two evaluation sets: the German-Fre
 To reproduce the results, run the following commands for the German-French test set:
 
 ```bash
-python3 files2align.py -dir eval_data/bleualign --source-language deu
-python3 sentAlign.py -dir eval_data/bleualign -sl deu -tl fra
-python3 evaluation/evaluate.py -t eval_data/bleualign/output/test*.txt.path -g eval_data/bleualign/gold/test*.txt
+python src/SentAlign/files2align.py -dir eval_data/bleualign --source-language deu
+python src/SentAlign/sentAlign.py -dir eval_data/bleualign -sl deu -tl fra
+
+python evaluation/evaluate.py -t eval_data/bleualign/output/test0.txt.path -g eval_data/bleualign/gold/test0.txt
 ```
 Which should give you the following results:
 ```

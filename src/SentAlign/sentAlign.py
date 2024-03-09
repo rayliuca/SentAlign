@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
 import multiprocessing
 
-from .reportInfo import ReportInfo
-from .repeatedTimer import RepeatedTimer
+from SentAlign.reportInfo import ReportInfo
+from SentAlign.repeatedTimer import RepeatedTimer
 import numpy as np
 import argparse
 import torch
@@ -18,78 +18,26 @@ import random
 import time
 import pyximport
 
-pyximport.install(setup_args={'include_dirs':np.get_include()}, inplace=True, reload_support=True)
-from .galechurch import gale_church
-from .greedy import greedy_anchor_selection, get_highest_labse_anchor, greedy_anchor_selection_large
-from .anchoring import calculate_anchor_nomatrix_set, calculate_anchor_set
-from .utilities import create_labse_score_matrix, loc_start_end_matrices
-from .align_anchors import align_anchors_multi
+pyximport.install(setup_args={'include_dirs': np.get_include()}, inplace=True, reload_support=True)
 
+from SentAlign.galechurch import gale_church
+from SentAlign.greedy import greedy_anchor_selection, get_highest_labse_anchor, greedy_anchor_selection_large
+from SentAlign.anchoring import calculate_anchor_nomatrix_set, calculate_anchor_set
+from SentAlign.utilities import create_labse_score_matrix, loc_start_end_matrices
+from SentAlign.align_anchors import align_anchors_multi
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 spinner = cycle('⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏')
 
-parser = argparse.ArgumentParser()
-#Input and output file locations
-parser.add_argument('--corpus-folder', '-dir')
-parser.add_argument('--source-language', '-sl', default='eng')
-parser.add_argument('--target-language', '-tl', default='isl')
-parser.add_argument('--filename', '-f', help='Name of source and target file(s) to be aligned', type=str, nargs='+')
-parser.add_argument('--output-folder', '-out', default='output')
-#Aligner settings
-parser.add_argument('--max-concatenations', '-concats', type=int, help='Maximum number of concatenated sentences per language', default=4)
-parser.add_argument('--free-concatenations', '-freejoins', type=int, help='Maximum number of concatenations before penalty is applied', default=2)
-parser.add_argument('--score-cutoff', '-cutoff', type=float, help='Minimum similarity score for a sentence pair to be considered', default=0.4)
-parser.add_argument('--minimum-length-words', '-minwords', type=int, help='Minimum number of words per language, for a sentence pair to be considered', default=1)
-parser.add_argument('--maximum-length-words', '-maxwords', type=int, help='Maximum number of words per language, for a sentence pair to be considered', default=110)
-parser.add_argument('--penalty-after-words', '-penwords', type=int, help='Maximum number of words per language, before a length penalty is applied', default=80)
-parser.add_argument('--penalty-per-word', '-wordpen', type=float, help='Penalty applied for each word when maximum number of unpenalized words have been reached', default=0.01)
-parser.add_argument('--anchoring-delimiter', '-anchor', type=int, help='Maximum nodes in the alignment graph, before applying hard delimiters.', default=4000000)
-parser.add_argument('--maximum-length-gale-church', '-maxgc', type=float, help='Maximum number of sentences in file for Gale-Church alignment. If longer, only greedy alignment selection applied', default=10000)
-# Other settings
-parser.add_argument('--proc-device', '-device', help='cuda for gpu, cpu if you don''t have an NVIDIA graphics card', default='cuda')
-parser.add_argument('--num-proc', '-proc', help='number of processors to allocate for the pathfinding calculations', default=8)
-args = parser.parse_args()
-
-corpus_folder = args.corpus_folder
-output_folder = args.corpus_folder + '/' + args.output_folder
-source_language_folder = corpus_folder + '/' + args.source_language
-target_language_folder = corpus_folder + '/' + args.target_language
-align_info_folder = corpus_folder + '/align_info/'
-if not os.path.exists(corpus_folder + '/tmp/'):
-    os.makedirs(corpus_folder + '/tmp/')
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
-if not os.path.exists(align_info_folder):
-    os.makedirs(align_info_folder)
-temporary_folder = corpus_folder + '/tmp/' + ''.join(random.choices(string.ascii_uppercase, k=8))
-os.mkdir(temporary_folder)
-file_in_list = args.filename
-
-max_concats = args.max_concatenations
-max_galechurch = args.maximum_length_gale_church
-score_cutoff = args.score_cutoff
-free_concats = args.free_concatenations
-minimum_length_words = args.minimum_length_words
-maximum_length_words = args.maximum_length_words
-start_penalty_word_number = args.penalty_after_words
-penalty_per_word = args.penalty_per_word
-
-max_length = 128
-batch_size = 128
-printline = ''
-
-cutoff4anchoring = args.anchoring_delimiter
-cutoff_penalty = 1.25
-minimum_labse_anchor = 0.95
-labse_subtraction = 0.05
-abs_minimum_labse_anchor = 0.8
-
 def print_progress(infoclass):
     infoclass.update_times()
-    print('{0: <26}'.format(infoclass.file_processing_stage) + '{0: <25}'.format(infoclass.input_file) + '{0: <18}'.format(str(infoclass.source_file_length) + ":" + str(infoclass.target_file_length)), '{0: <18}'.format("Files left: " + str(infoclass.files_left)),
+    print('{0: <26}'.format(infoclass.file_processing_stage) + '{0: <25}'.format(
+        infoclass.input_file) + '{0: <18}'.format(
+        str(infoclass.source_file_length) + ":" + str(infoclass.target_file_length)),
+          '{0: <18}'.format("Files left: " + str(infoclass.files_left)),
           end='\r')
+
 
 def load_labse_model(proc_device, labse_model):
     print("Loading LaBSE model...", end='\r')
@@ -149,7 +97,10 @@ def get_overlaps(output_file, input_file, num_overlaps):
         output.append(out_line)
         output_numbers.append(out_line_numbers)
         output_overlaps.append(len(out_line_numbers.split(',')))
-    with open(output_file, 'wt', encoding="utf-8") as fout, open(output_file + '.linenumbers', 'wt', encoding="utf-8") as fout_lines, open(output_file + '.overlaps', 'wt', encoding="utf-8") as fout_overlaps, open(output_file + '.lengthok', 'wt', encoding="utf-8") as fout_lengthok:
+    with open(output_file, 'wt', encoding="utf-8") as fout, open(output_file + '.linenumbers', 'wt',
+                                                                 encoding="utf-8") as fout_lines, open(
+        output_file + '.overlaps', 'wt', encoding="utf-8") as fout_overlaps, open(output_file + '.lengthok', 'wt',
+                                                                                  encoding="utf-8") as fout_lengthok:
         for o_line in output:
             fout.write(o_line + '\n')
         for on_line in output_numbers:
@@ -158,6 +109,7 @@ def get_overlaps(output_file, input_file, num_overlaps):
             fout_overlaps.write(str(oo_line) + '\n')
         for ol_line in output_lengthok:
             fout_lengthok.write(str(ol_line) + '\n')
+
 
 ##### LABSE FUNCTIONS #####
 def create_list(infile):
@@ -188,7 +140,8 @@ def emb_file(in_list, in_numpy):
     ctr = 0
     for i in in_list:
         ctr += 1
-        inputs = tokenizer(i, return_tensors="pt", padding=True, truncation=True, max_length=512, add_special_tokens = True)
+        inputs = tokenizer(i, return_tensors="pt", padding=True, truncation=True, max_length=512,
+                           add_special_tokens=True)
         inputs = inputs.to(args.proc_device)
         with torch.no_grad():
             outputs = model(**inputs)
@@ -205,14 +158,14 @@ def emb_file(in_list, in_numpy):
 def create_emb_file(infile, maximum_length):
     temp_max_length = maximum_length
     embs_numpy = None
-    while temp_max_length > 30: #arbitrary number, allow user to select in arguments?
+    while temp_max_length > 30:  # arbitrary number, allow user to select in arguments?
         try:
             sentence_list = create_list(infile)
             embs_numpy = emb_file(sentence_list, embs_numpy)
             break
         except Exception as e:
             print(e, temp_max_length)
-            temp_max_length = temp_max_length * 0.75 #arbitrary number, allow user to select in arguments?
+            temp_max_length = temp_max_length * 0.75  # arbitrary number, allow user to select in arguments?
     f_out = open(infile + '.labse_emb', 'wb')
     np.save(f_out, embs_numpy)
     f_out.close()
@@ -246,7 +199,7 @@ def get_pairs(path, source_dict, target_dict, total_score):
     score_list = total_score.strip().split('\n')
     ctr = 0
     for p in path_pairs:
-        s,t = p.strip().replace('[','').replace(']','').split(':')
+        s, t = p.strip().replace('[', '').replace(']', '').split(':')
         s_nums = s.split(',')
         t_nums = t.split(',')
         source_out = ''
@@ -306,9 +259,11 @@ def similarity_matrix(embeddings_1, embeddings_2):
 
 
 def score_labse_matrix(source_list, target_list):
-    source_inputs = tokenizer(source_list, return_tensors="pt", padding=True, truncation=True, max_length=512, add_special_tokens=True)
+    source_inputs = tokenizer(source_list, return_tensors="pt", padding=True, truncation=True, max_length=512,
+                              add_special_tokens=True)
     source_inputs = source_inputs.to(args.proc_device)
-    target_inputs = tokenizer(target_list, return_tensors="pt", padding=True, truncation=True, max_length=512, add_special_tokens=True)
+    target_inputs = tokenizer(target_list, return_tensors="pt", padding=True, truncation=True, max_length=512,
+                              add_special_tokens=True)
     target_inputs = target_inputs.to(args.proc_device)
 
     with torch.no_grad():
@@ -343,7 +298,9 @@ def score_labse_matrix_split(anchor_source_list, anchor_target_list, anchor_sour
 
 
 def galechurchSupport(file_name):
-    alignments_out, highest_score, len_x, len_y = gale_church(source_language_folder + '/' + file_name, target_language_folder + '/' + file_name, 5000, None) # allow setting max_length for galechurch
+    alignments_out, highest_score, len_x, len_y = gale_church(source_language_folder + '/' + file_name,
+                                                              target_language_folder + '/' + file_name, 5000,
+                                                              None)  # allow setting max_length for galechurch
     galechurch_alignments = []
 
     for a in alignments_out.split('\n'):
@@ -357,7 +314,10 @@ def galechurchSupport(file_name):
     return galechurch_alignments
 
 
-def anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_dict, minimum_anchor_score, anchor_source_list_lines,anchor_target_list_lines, source_len, target_len, anchor_source_list, anchor_target_list, start_source, start_target, anchor_in, source_loc_start_list, source_loc_end_list, target_loc_start_list, target_loc_end_list, labse_score_matrix):
+def anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_dict, minimum_anchor_score,
+                anchor_source_list_lines, anchor_target_list_lines, source_len, target_len, anchor_source_list,
+                anchor_target_list, start_source, start_target, anchor_in, source_loc_start_list, source_loc_end_list,
+                target_loc_start_list, target_loc_end_list, labse_score_matrix):
     anchor_list = [anchor_in]
     try:
         end_source = int(anchor_in[0].split(',')[0])
@@ -371,11 +331,15 @@ def anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_d
     try:
         if len(galechurch_alignments) > 0:
             processInfo.set_status("Calculating anchors without matrix")
-            anchor_list = calculate_anchor_nomatrix_set(galechurch_alignments, src_emb_dict, trg_emb_dict, minimum_anchor_score,
-                                                        anchor_source_list_lines, anchor_target_list_lines, source_len, target_len,
-                                                        anchor_source_list, anchor_target_list, start_source, end_source,
+            anchor_list = calculate_anchor_nomatrix_set(galechurch_alignments, src_emb_dict, trg_emb_dict,
+                                                        minimum_anchor_score,
+                                                        anchor_source_list_lines, anchor_target_list_lines, source_len,
+                                                        target_len,
+                                                        anchor_source_list, anchor_target_list, start_source,
+                                                        end_source,
                                                         start_target, end_target, labse_score_matrix,
-                                                        source_loc_start_list, source_loc_end_list, target_loc_start_list, target_loc_end_list)
+                                                        source_loc_start_list, source_loc_end_list,
+                                                        target_loc_start_list, target_loc_end_list)
     except:
         print("anchorsLoop failed")
 
@@ -397,9 +361,11 @@ def anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_d
             if currentNumberOfKnots > cutoff4anchoring:
                 try:
                     new_anchor_list = anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_dict,
-                                              minimum_anchor_score - 0.02, anchor_source_list_lines,
-                                              anchor_target_list_lines, source_len, target_len, anchor_source_list,
-                                              anchor_target_list, start_source, start_target, anchor, source_loc_start_list, source_loc_end_list, target_loc_start_list, target_loc_end_list, labse_score_matrix)
+                                                  minimum_anchor_score - 0.02, anchor_source_list_lines,
+                                                  anchor_target_list_lines, source_len, target_len, anchor_source_list,
+                                                  anchor_target_list, start_source, start_target, anchor,
+                                                  source_loc_start_list, source_loc_end_list, target_loc_start_list,
+                                                  target_loc_end_list, labse_score_matrix)
                     for nal in new_anchor_list:
                         if nal not in anchors_out:
                             anchors_out.append(nal)
@@ -446,7 +412,12 @@ def create_anchor_files(file_name, sentence_overlap, lengthfilter):
     anchor_target_list_lines = []
     src_emb_dict = {}
     trg_emb_dict = {}
-    with open(anchor_overlaps_source_file + str(sentence_overlap) + '.used', 'w') as anchor_src_overlaps_file, open(anchor_overlaps_target_file + str(sentence_overlap) + '.used', 'w') as anchor_trg_overlaps_file, open(anchor_overlaps_source_file + str(sentence_overlap) + '.linenumbers', 'w') as anchor_src_overlaps_file_linenumbers, open(anchor_overlaps_target_file + str(sentence_overlap) + '.linenumbers', 'w') as anchor_trg_overlaps_file_linenumbers:
+    with open(anchor_overlaps_source_file + str(sentence_overlap) + '.used', 'w') as anchor_src_overlaps_file, open(
+            anchor_overlaps_target_file + str(sentence_overlap) + '.used', 'w') as anchor_trg_overlaps_file, open(
+        anchor_overlaps_source_file + str(sentence_overlap) + '.linenumbers',
+        'w') as anchor_src_overlaps_file_linenumbers, open(
+        anchor_overlaps_target_file + str(sentence_overlap) + '.linenumbers',
+        'w') as anchor_trg_overlaps_file_linenumbers:
         embs = np.load(src_overlaps_file + '.labse_emb', allow_pickle=True)
         for line_ctr in range(0, len(src_overlaps_used)):
             num_overlaps = int(src_num_overlaps_file[line_ctr])
@@ -491,11 +462,13 @@ def create_anchor_files(file_name, sentence_overlap, lengthfilter):
     return anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, src_emb_dict, trg_emb_dict
 
 
-def greedy_procedure_large(file_name, anchor_list, file_minimum_anchor_score, anchor_score_subtraction, temp_cutoff4anchoring, cutoffpenalty):
+def greedy_procedure_large(file_name, anchor_list, file_minimum_anchor_score, anchor_score_subtraction,
+                           temp_cutoff4anchoring, cutoffpenalty):
     processInfo.set_status('Greedy Anchoring')
     torch.cuda.empty_cache()
     maxNumberOfKnots = 9223372036854775807
-    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(file_name, 1, True)
+    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(
+        file_name, 1, True)
 
     while maxNumberOfKnots > temp_cutoff4anchoring:
         start_source = 0
@@ -522,17 +495,19 @@ def greedy_procedure_large(file_name, anchor_list, file_minimum_anchor_score, an
                     j_ctr = 0
                     for j in anchor_target_list:
                         if j_ctr >= start_target and j_ctr < end_target:
-                            labse_score_matrix[i_ctr - start_source][j_ctr - start_target] = np.dot(anchor_src_emb_dict[i.strip()], anchor_trg_emb_dict[j.strip()])
+                            labse_score_matrix[i_ctr - start_source][j_ctr - start_target] = np.dot(
+                                anchor_src_emb_dict[i.strip()], anchor_trg_emb_dict[j.strip()])
                         j_ctr += 1
                 i_ctr += 1
 
             numberOfKnots = (end_source - start_source) * (end_target - start_target)
             if numberOfKnots > maxNumberOfKnots:
                 maxNumberOfKnots = numberOfKnots
-            if numberOfKnots > temp_cutoff4anchoring: #(30k x 30k matrix or equivalent)
+            if numberOfKnots > temp_cutoff4anchoring:  # (30k x 30k matrix or equivalent)
                 temp_greedy_anchor = greedy_anchor_selection_large(file_minimum_anchor_score, labse_score_matrix)
                 if temp_greedy_anchor is not None:
-                    greedy_anchor = [str(temp_greedy_anchor[0] + start_source), str(temp_greedy_anchor[1] + start_target)]
+                    greedy_anchor = [str(temp_greedy_anchor[0] + start_source),
+                                     str(temp_greedy_anchor[1] + start_target)]
                     if greedy_anchor not in new_anchor_list:
                         new_anchor_list.append(greedy_anchor)
             if anchor not in new_anchor_list:
@@ -554,10 +529,13 @@ def greedy_procedure_large(file_name, anchor_list, file_minimum_anchor_score, an
     return anchor_list
 
 
-def greedy_procedure(file_name, anchor_list, file_minimum_anchor_score, anchor_score_subtraction, temp_cutoff4anchoring, cutoffpenalty):
-    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(file_name, 1, True)
+def greedy_procedure(file_name, anchor_list, file_minimum_anchor_score, anchor_score_subtraction, temp_cutoff4anchoring,
+                     cutoffpenalty):
+    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(
+        file_name, 1, True)
     # this will not work if we have overlaps (other than 1)
-    labse_score_matrix = np.asarray(create_labse_score_matrix(anchor_source_list, anchor_target_list, anchor_src_emb_dict, anchor_trg_emb_dict))
+    labse_score_matrix = np.asarray(
+        create_labse_score_matrix(anchor_source_list, anchor_target_list, anchor_src_emb_dict, anchor_trg_emb_dict))
 
     torch.cuda.empty_cache()
     maxNumberOfKnots = 9223372036854775807
@@ -602,6 +580,7 @@ def greedy_procedure(file_name, anchor_list, file_minimum_anchor_score, anchor_s
         pass
     return anchor_list
 
+
 def create_anchors_nomatrix(file_name, file_minimum_labse_anchor, source_len, target_len, galechurch_alignments):
     # This function works if there are very many knots (tens of millions) so that a matrix of scores can't be loaded into memory
     # It is slower than the matrix version, but it works for large corpora
@@ -609,7 +588,8 @@ def create_anchors_nomatrix(file_name, file_minimum_labse_anchor, source_len, ta
     processInfo.set_status('create_anchors_nomatrix')
     torch.cuda.empty_cache()
 
-    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, src_emb_dict, trg_emb_dict = create_anchor_files(file_name, 2, False)
+    anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, src_emb_dict, trg_emb_dict = create_anchor_files(
+        file_name, 2, False)
 
     start_source = 0
     start_target = 0
@@ -622,12 +602,16 @@ def create_anchors_nomatrix(file_name, file_minimum_labse_anchor, source_len, ta
         if len(galechurch_alignments) > 0:
             source_loc_start_list, source_loc_end_list = loc_start_end_matrices(anchor_source_list_lines)
             target_loc_start_list, target_loc_end_list = loc_start_end_matrices(anchor_target_list_lines)
-            labse_score_matrix = np.asarray(create_labse_score_matrix(anchor_source_list, anchor_target_list, src_emb_dict, trg_emb_dict))
+            labse_score_matrix = np.asarray(
+                create_labse_score_matrix(anchor_source_list, anchor_target_list, src_emb_dict, trg_emb_dict))
 
-            anchor_list = anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_dict, file_minimum_labse_anchor,
-                                      anchor_source_list_lines, anchor_target_list_lines, source_len, target_len, anchor_source_list,
+            anchor_list = anchorsLoop(cutoff4anchoring, galechurch_alignments, src_emb_dict, trg_emb_dict,
+                                      file_minimum_labse_anchor,
+                                      anchor_source_list_lines, anchor_target_list_lines, source_len, target_len,
+                                      anchor_source_list,
                                       anchor_target_list, start_source, start_target, anchor_list[0],
-                                      source_loc_start_list, source_loc_end_list, target_loc_start_list, target_loc_end_list, labse_score_matrix)
+                                      source_loc_start_list, source_loc_end_list, target_loc_start_list,
+                                      target_loc_end_list, labse_score_matrix)
 
     start_source = 0
     start_target = 0
@@ -657,7 +641,8 @@ def create_anchors_nomatrix(file_name, file_minimum_labse_anchor, source_len, ta
     if greedy_flag:
         processInfo.set_status('Greedy Anchoring')
         start_greedy = time.process_time()
-        anchor_list = greedy_procedure(file_name, anchor_list, file_minimum_labse_anchor, labse_subtraction, cutoff4anchoring, cutoff_penalty)
+        anchor_list = greedy_procedure(file_name, anchor_list, file_minimum_labse_anchor, labse_subtraction,
+                                       cutoff4anchoring, cutoff_penalty)
         end_greedy = time.process_time()
         elapsed_greedy = end_greedy - start_greedy
         processInfo.set_elapsed_greedy(elapsed_greedy)
@@ -680,11 +665,11 @@ def process_file(filename, minimum_labse_anchor):
     maxNumberOfKnots = source_len * target_len
 
     ## overlaps ##
-    #source
+    # source
     src_input_file = source_language_folder + '/' + file_name
     src_overlaps_file = temporary_folder + '/overlaps.' + file_name + '.src'
     get_overlaps(src_overlaps_file, src_input_file, max_concats)
-    #target
+    # target
     trg_input_file = target_language_folder + '/' + file_name
     trg_overlaps_file = temporary_folder + '/overlaps.' + file_name + '.trg'
     get_overlaps(trg_overlaps_file, trg_input_file, max_concats)
@@ -700,9 +685,10 @@ def process_file(filename, minimum_labse_anchor):
             processInfo.set_status("Greedy anchoring large file...")
             start_greedy = time.process_time()
             max_matrix_size_for_greedy = 1000000000
-            if (source_len*target_len) > max_matrix_size_for_greedy:
+            if (source_len * target_len) > max_matrix_size_for_greedy:
                 slow_greedy = True
-                anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(file_name, 1, True)
+                anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(
+                    file_name, 1, True)
 
                 while slow_greedy:
                     new_anchor_list = []
@@ -710,14 +696,21 @@ def process_file(filename, minimum_labse_anchor):
                     start_source = 0
                     start_target = 0
                     for anchor in anchor_list:
-                        if (int(anchor[0])-int(start_source))*(int(anchor[1])-int(start_target)) > max_matrix_size_for_greedy:
-                            new_anchor = get_highest_labse_anchor(start_source, start_target, anchor, anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict)
+                        if (int(anchor[0]) - int(start_source)) * (
+                                int(anchor[1]) - int(start_target)) > max_matrix_size_for_greedy:
+                            new_anchor = get_highest_labse_anchor(start_source, start_target, anchor,
+                                                                  anchor_source_list, anchor_target_list,
+                                                                  anchor_source_list_lines, anchor_target_list_lines,
+                                                                  anchor_src_emb_dict, anchor_trg_emb_dict)
                             if new_anchor is not None:
                                 new_anchor_list.append(new_anchor)
                                 try:
-                                    new_matrix_first = (int(new_anchor[0]) - start_source) * (int(new_anchor[1]) - start_target)
-                                    new_matrix_second = (int(anchor[0]) - int(new_anchor[0])) * (int(anchor[1]) - int(new_anchor[1]))
-                                    if (new_matrix_first > max_matrix_size_for_greedy) or (new_matrix_second > max_matrix_size_for_greedy):
+                                    new_matrix_first = (int(new_anchor[0]) - start_source) * (
+                                            int(new_anchor[1]) - start_target)
+                                    new_matrix_second = (int(anchor[0]) - int(new_anchor[0])) * (
+                                            int(anchor[1]) - int(new_anchor[1]))
+                                    if (new_matrix_first > max_matrix_size_for_greedy) or (
+                                            new_matrix_second > max_matrix_size_for_greedy):
                                         slow_greedy = True
                                 except:
                                     pass
@@ -730,14 +723,16 @@ def process_file(filename, minimum_labse_anchor):
                     print('slow greedy anchor list:', anchor_list)
 
             file_minimum_labse_anchor = minimum_labse_anchor
-            anchor_list = greedy_procedure_large(file_name, anchor_list, file_minimum_labse_anchor, labse_subtraction, cutoff4anchoring, cutoff_penalty)
+            anchor_list = greedy_procedure_large(file_name, anchor_list, file_minimum_labse_anchor, labse_subtraction,
+                                                 cutoff4anchoring, cutoff_penalty)
             end_greedy = time.process_time()
             elapsed_greedy = end_greedy - start_greedy
             processInfo.set_elapsed_greedy(elapsed_greedy)
         else:
             if maxNumberOfKnots > cutoff4anchoring:
                 processInfo.set_status("Calculating anchors...")
-                anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(file_name, 2, True)
+                anchor_source_list, anchor_target_list, anchor_source_list_lines, anchor_target_list_lines, anchor_src_emb_dict, anchor_trg_emb_dict = create_anchor_files(
+                    file_name, 2, True)
 
                 try:
                     processInfo.set_status("Doing Gale-Church...")
@@ -759,7 +754,8 @@ def process_file(filename, minimum_labse_anchor):
                                 # slower approach - calculate each knot in the matrix individually. Doesn't use as much memory while calculating.
                                 torch.cuda.empty_cache()
                                 processInfo.set_anchoring()
-                                labse_matrix = score_labse_matrix_split(anchor_source_list, anchor_target_list, anchor_src_emb_dict, anchor_trg_emb_dict)
+                                labse_matrix = score_labse_matrix_split(anchor_source_list, anchor_target_list,
+                                                                        anchor_src_emb_dict, anchor_trg_emb_dict)
                                 torch.cuda.empty_cache()
 
                             source_start_matrix = []
@@ -783,7 +779,12 @@ def process_file(filename, minimum_labse_anchor):
                             processInfo.set_status("Calc anchors... " + str(file_minimum_labse_anchor))
                             start_source = 0
                             start_target = 0
-                            anchor_list = calculate_anchor_set(source_start_matrix, source_end_matrix, target_start_matrix, target_end_matrix, galechurch_alignments, labse_matrix, file_minimum_labse_anchor, anchor_source_list_lines, anchor_target_list_lines, start_source, source_len, start_target, target_len)
+                            anchor_list = calculate_anchor_set(source_start_matrix, source_end_matrix,
+                                                               target_start_matrix, target_end_matrix,
+                                                               galechurch_alignments, labse_matrix,
+                                                               file_minimum_labse_anchor, anchor_source_list_lines,
+                                                               anchor_target_list_lines, start_source, source_len,
+                                                               start_target, target_len)
 
                             while maxNumberOfKnots > cutoff4anchoring:
                                 processInfo.set_status("Calc anchors... " + str(file_minimum_labse_anchor))
@@ -806,10 +807,14 @@ def process_file(filename, minimum_labse_anchor):
                                     numberOfKnots = (end_source - start_source) * (end_target - start_target)
                                     maxNumberOfKnots = max(maxNumberOfKnots, numberOfKnots)
                                     if numberOfKnots > cutoff4anchoring:
-                                        temp_anchor_list = calculate_anchor_set(source_start_matrix, source_end_matrix, target_start_matrix, target_end_matrix, galechurch_alignments, labse_matrix,
-                                                                           file_minimum_labse_anchor, anchor_source_list_lines,
-                                                                           anchor_target_list_lines,
-                                                                           start_source, end_source, start_target, end_target)
+                                        temp_anchor_list = calculate_anchor_set(source_start_matrix, source_end_matrix,
+                                                                                target_start_matrix, target_end_matrix,
+                                                                                galechurch_alignments, labse_matrix,
+                                                                                file_minimum_labse_anchor,
+                                                                                anchor_source_list_lines,
+                                                                                anchor_target_list_lines,
+                                                                                start_source, end_source, start_target,
+                                                                                end_target)
                                         for temp_anchor in temp_anchor_list:
                                             if temp_anchor not in new_anchor_list:
                                                 new_anchor_list.append(temp_anchor)
@@ -832,7 +837,8 @@ def process_file(filename, minimum_labse_anchor):
                             processInfo.set_elapsed_calc_anchors(elapsed_calcanchors)
                             processInfo.set_status("Greedy anchoring...")
                             start_greedy = time.process_time()
-                            anchor_list = greedy_procedure(file_name, anchor_list, minimum_labse_anchor, labse_subtraction, cutoff4anchoring, cutoff_penalty)
+                            anchor_list = greedy_procedure(file_name, anchor_list, minimum_labse_anchor,
+                                                           labse_subtraction, cutoff4anchoring, cutoff_penalty)
                             end_greedy = time.process_time()
                             elapsed_greedy = end_greedy - start_greedy
                             processInfo.set_elapsed_greedy(elapsed_greedy)
@@ -841,11 +847,14 @@ def process_file(filename, minimum_labse_anchor):
                             print(e)
                             source_len = len(source_dict.keys())
                             target_len = len(target_dict.keys())
-                            anchor_list = create_anchors_nomatrix(file_name, file_minimum_labse_anchor-labse_subtraction, source_len, target_len, galechurch_alignments)
+                            anchor_list = create_anchors_nomatrix(file_name,
+                                                                  file_minimum_labse_anchor - labse_subtraction,
+                                                                  source_len, target_len, galechurch_alignments)
                     else:
                         processInfo.set_status("Greedy anchoring...")
                         start_greedy = time.process_time()
-                        anchor_list = greedy_procedure(file_name, anchor_list, file_minimum_labse_anchor, labse_subtraction, cutoff4anchoring, cutoff_penalty)
+                        anchor_list = greedy_procedure(file_name, anchor_list, file_minimum_labse_anchor,
+                                                       labse_subtraction, cutoff4anchoring, cutoff_penalty)
                         end_greedy = time.process_time()
                         elapsed_greedy = end_greedy - start_greedy
                         processInfo.set_elapsed_greedy(elapsed_greedy)
@@ -878,16 +887,18 @@ def process_file(filename, minimum_labse_anchor):
             except:
                 target_end_anchor = int(curr_anchor[1])
             this_anchor = (source_end_anchor, target_end_anchor)
-            matrix_anchors += (((start_anchor[0]-1, start_anchor[1]-1), (this_anchor[0],this_anchor[1])),)
+            matrix_anchors += (((start_anchor[0] - 1, start_anchor[1] - 1), (this_anchor[0], this_anchor[1])),)
             start_anchor = this_anchor
 
         torch.cuda.empty_cache()
         processInfo.set_status("Aligning...")
         start_align = time.process_time()
 
-        total_path, total_score = align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict, trg_emb_dict, args.num_proc, score_cutoff,
-                                         max_concats, processInfo, minimum_length_words, maximum_length_words, start_penalty_word_number,
-                                         penalty_per_word, free_concats)
+        total_path, total_score = align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict,
+                                                      trg_emb_dict, args.num_proc, score_cutoff,
+                                                      max_concats, processInfo, minimum_length_words,
+                                                      maximum_length_words, start_penalty_word_number,
+                                                      penalty_per_word, free_concats)
 
         finalpairs = get_pairs(total_path, source_dict, target_dict, total_score)
         align_info = processInfo.print_info()
@@ -904,6 +915,7 @@ def process_file(filename, minimum_labse_anchor):
     for files2del in tempfiles:
         os.remove(files2del)
 
+
 def get_filesleft(alignlist):
     filesdonefile = open(corpus_folder + '/filesdone.txt', 'r')
     searchset = filesdonefile.readlines()
@@ -919,8 +931,79 @@ def get_filesleft(alignlist):
     filesleft = list(set(alignlist) - set(donelist))
     return filesleft
 
+
 # Create overlaps
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    # Input and output file locations
+    parser.add_argument('--corpus-folder', '-dir')
+    parser.add_argument('--source-language', '-sl', default='eng')
+    parser.add_argument('--target-language', '-tl', default='isl')
+    parser.add_argument('--filename', '-f', help='Name of source and target file(s) to be aligned', type=str, nargs='+')
+    parser.add_argument('--output-folder', '-out', default='output')
+    # Aligner settings
+    parser.add_argument('--max-concatenations', '-concats', type=int,
+                        help='Maximum number of concatenated sentences per language', default=4)
+    parser.add_argument('--free-concatenations', '-freejoins', type=int,
+                        help='Maximum number of concatenations before penalty is applied', default=2)
+    parser.add_argument('--score-cutoff', '-cutoff', type=float,
+                        help='Minimum similarity score for a sentence pair to be considered', default=0.4)
+    parser.add_argument('--minimum-length-words', '-minwords', type=int,
+                        help='Minimum number of words per language, for a sentence pair to be considered', default=1)
+    parser.add_argument('--maximum-length-words', '-maxwords', type=int,
+                        help='Maximum number of words per language, for a sentence pair to be considered', default=110)
+    parser.add_argument('--penalty-after-words', '-penwords', type=int,
+                        help='Maximum number of words per language, before a length penalty is applied', default=80)
+    parser.add_argument('--penalty-per-word', '-wordpen', type=float,
+                        help='Penalty applied for each word when maximum number of unpenalized words have been reached',
+                        default=0.01)
+    parser.add_argument('--anchoring-delimiter', '-anchor', type=int,
+                        help='Maximum nodes in the alignment graph, before applying hard delimiters.', default=4000000)
+    parser.add_argument('--maximum-length-gale-church', '-maxgc', type=float,
+                        help='Maximum number of sentences in file for Gale-Church alignment. If longer, only greedy alignment selection applied',
+                        default=10000)
+    # Other settings
+    parser.add_argument('--proc-device', '-device', help='cuda for gpu, cpu if you don''t have an NVIDIA graphics card',
+                        default='cuda')
+    parser.add_argument('--num-proc', '-proc', help='number of processors to allocate for the pathfinding calculations',
+                        default=8)
+    args = parser.parse_args()
+
+    corpus_folder = args.corpus_folder
+    output_folder = args.corpus_folder + '/' + args.output_folder
+    source_language_folder = corpus_folder + '/' + args.source_language
+    target_language_folder = corpus_folder + '/' + args.target_language
+    align_info_folder = corpus_folder + '/align_info/'
+    if not os.path.exists(corpus_folder + '/tmp/'):
+        os.makedirs(corpus_folder + '/tmp/')
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    if not os.path.exists(align_info_folder):
+        os.makedirs(align_info_folder)
+    temporary_folder = corpus_folder + '/tmp/' + ''.join(random.choices(string.ascii_uppercase, k=8))
+    os.mkdir(temporary_folder)
+    file_in_list = args.filename
+
+    max_concats = args.max_concatenations
+    max_galechurch = args.maximum_length_gale_church
+    score_cutoff = args.score_cutoff
+    free_concats = args.free_concatenations
+    minimum_length_words = args.minimum_length_words
+    maximum_length_words = args.maximum_length_words
+    start_penalty_word_number = args.penalty_after_words
+    penalty_per_word = args.penalty_per_word
+
+    max_length = 128
+    batch_size = 128
+    printline = ''
+
+    cutoff4anchoring = args.anchoring_delimiter
+    cutoff_penalty = 1.25
+    minimum_labse_anchor = 0.95
+    labse_subtraction = 0.05
+    abs_minimum_labse_anchor = 0.8
+
+    ### ori main
     main_starttime = datetime.datetime.now()
     tokenizer, model = load_labse_model(args.proc_device, 'setu4993/LaBSE')
     files2align = {}
@@ -936,8 +1019,8 @@ if __name__ == '__main__':
     processInfo = ReportInfo(datetime.datetime.now(), len(alignlist))
     rt = RepeatedTimer(0.3, print_progress, processInfo)
 
-    #if running multiple instances of the script on the same directory, this remakes the list of files to align
-    redolist_interval = int(len(alignlist)/500)+1
+    # if running multiple instances of the script on the same directory, this remakes the list of files to align
+    redolist_interval = int(len(alignlist) / 500) + 1
 
     try:
         while len(alignlist) > 0:
@@ -946,7 +1029,8 @@ if __name__ == '__main__':
                 processInfo.set_status('Getting files to align...')
                 alignlist = get_filesleft(alignlist)
                 processInfo.files_left = len(alignlist)
-                redolist_interval = int(len(alignlist)/500)+1 #Allow the user to set this number (500) in the input parameters
+                redolist_interval = int(
+                    len(alignlist) / 500) + 1  # Allow the user to set this number (500) in the input parameters
             if len(alignlist) > 0:
                 file = alignlist.pop()
 
@@ -968,5 +1052,5 @@ if __name__ == '__main__':
     except:
         pass
 
-    print('\nAligned ' + str(len(list(files2align.keys()))) + ' files in ' + str((datetime.datetime.now() - main_starttime).total_seconds()) + ' seconds.', flush=True)
-
+    print('\nAligned ' + str(len(list(files2align.keys()))) + ' files in ' + str(
+        (datetime.datetime.now() - main_starttime).total_seconds()) + ' seconds.', flush=True)

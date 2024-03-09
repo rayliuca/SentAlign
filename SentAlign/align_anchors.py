@@ -1,10 +1,11 @@
 # -*- coding: UTF-8 -*-
-import multiprocessing
-from itertools import repeat, combinations
-import time
 import logging
+import multiprocessing
+import time
+from itertools import repeat, combinations
 
 logger = logging.getLogger('sentenceAligner')
+
 
 def align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict, trg_emb_dict, num_proc, score_cutoff,
                         max_concats, processInfo, minimum_length_words, maximum_length_words, start_penalty_word_number,
@@ -18,7 +19,6 @@ def align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict, 
         total_calculations += source_length * target_length
     processInfo.set_total_calculations(total_calculations)
 
-
     if num_proc == 0:
         run_proc = 1
     else:
@@ -28,7 +28,8 @@ def align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict, 
         res = pool.starmap(align_anchors,
                            zip(matrix_anchors, repeat(source_dict), repeat(target_dict), repeat(src_emb_dict),
                                repeat(trg_emb_dict), repeat(score_cutoff), repeat(max_concats),
-                               repeat(minimum_length_words), repeat(maximum_length_words), repeat(start_penalty_word_number),
+                               repeat(minimum_length_words), repeat(maximum_length_words),
+                               repeat(start_penalty_word_number),
                                repeat(penalty_per_word), repeat(free_concats), repeat(processInfo)))
         for result in res:
             total_path += result[1]
@@ -37,7 +38,8 @@ def align_anchors_multi(matrix_anchors, source_dict, target_dict, src_emb_dict, 
 
 
 def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, score_cutoff, max_concats,
-                  minimum_length_words, maximum_length_words, start_penalty_word_number, penalty_per_word, free_concats, processInfo):
+                  minimum_length_words, maximum_length_words, start_penalty_word_number, penalty_per_word, free_concats,
+                  processInfo):
     start_source = anchor[0][0]
     start_target = anchor[0][1]
     end_source = anchor[1][0]
@@ -49,12 +51,14 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
 
     best_score_array = [[0 for y in range(end_target - start_target)] for x in range(end_source - start_source)]
     best_path_array = [['' for y in range(end_target - start_target)] for x in range(end_source - start_source)]
-    best_parent_array = [[(-1,-1) for y in range(end_target - start_target)] for x in range(end_source - start_source)]
+    best_parent_array = [[(-1, -1) for y in range(end_target - start_target)] for x in range(end_source - start_source)]
 
     for i in range(start_source, end_source):
-        source_concats, source_concats_count_dict = create_concats(start_source, i, max_concats, source_length, source_dict)
+        source_concats, source_concats_count_dict = create_concats(start_source, i, max_concats, source_length,
+                                                                   source_dict)
         for j in range(start_target, end_target):
-            target_concats, target_concats_count_dict = create_concats(start_target, j, max_concats, target_length, target_dict)
+            target_concats, target_concats_count_dict = create_concats(start_target, j, max_concats, target_length,
+                                                                       target_dict)
 
             if i == start_source:
                 if j == start_target:
@@ -62,22 +66,22 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
                     best_score_array[i - start_source][j - start_target] = 0
                     max_score = 0
                 else:
-                    previous_score = best_score_array[i-start_source][j-1-start_target]
+                    previous_score = best_score_array[i - start_source][j - 1 - start_target]
                     best_score_array[i - start_source][j - start_target] = previous_score + score_cutoff
                     best_parent_array[i - start_source][j - start_target] = (i - start_source, j - 1 - start_target)
                     best_path_array[i - start_source][j - start_target] = '[:' + str(j) + ']\n'
                     max_score = previous_score + score_cutoff
             else:
                 if j == start_target:
-                    previous_score = best_score_array[i-1-start_source][j-start_target]
+                    previous_score = best_score_array[i - 1 - start_source][j - start_target]
                     best_score_array[i - start_source][j - start_target] = previous_score + score_cutoff
                     best_parent_array[i - start_source][j - start_target] = (i - 1 - start_source, j - start_target)
                     best_path_array[i - start_source][j - start_target] = '[' + str(i) + ':]\n'
                     max_score = previous_score + score_cutoff
                 else:
-                    previous_score = best_score_array[i-1-start_source][j-1-start_target]
-                    left_score = best_score_array[i-start_source][j-1-start_target]
-                    up_score = best_score_array[i-1-start_source][j-start_target]
+                    previous_score = best_score_array[i - 1 - start_source][j - 1 - start_target]
+                    left_score = best_score_array[i - start_source][j - 1 - start_target]
+                    up_score = best_score_array[i - 1 - start_source][j - start_target]
                     if left_score < up_score:
                         best_score_array[i - start_source][j - start_target] = up_score + score_cutoff
                         best_parent_array[i - start_source][j - start_target] = (i - 1 - start_source, j - start_target)
@@ -90,19 +94,20 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
                         max_score = left_score + score_cutoff
 
             for m in source_concats:
-                m_ctr = source_concats_count_dict[m]-1
+                m_ctr = source_concats_count_dict[m] - 1
                 for n in target_concats:
-                    n_ctr = target_concats_count_dict[n]-1
+                    n_ctr = target_concats_count_dict[n] - 1
                     try:
                         labse_score = trg_emb_dict[n].dot(src_emb_dict[m].transpose())
                     except:
                         labse_score = 0
 
-                    total_splits = m_ctr+n_ctr+2
+                    total_splits = m_ctr + n_ctr + 2
 
-                    if (i-(m_ctr+1)) >= start_source and (j-(n_ctr+1)) >= start_target:
+                    if (i - (m_ctr + 1)) >= start_source and (j - (n_ctr + 1)) >= start_target:
                         try:
-                            best_node_score = best_score_array[i - (m_ctr+1) - (start_source)][j - (n_ctr+1) - (start_target)]
+                            best_node_score = best_score_array[i - (m_ctr + 1) - (start_source)][
+                                j - (n_ctr + 1) - (start_target)]
                         except:
                             best_node_score = 0
                     else:
@@ -110,7 +115,9 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
 
                     s_concat_length = m.count(' ') + 1
                     t_concat_length = n.count(' ') + 1
-                    if (minimum_length_words <= s_concat_length <= maximum_length_words) and (minimum_length_words <= t_concat_length <= maximum_length_words) and (score_cutoff <= labse_score):
+                    if (minimum_length_words <= s_concat_length <= maximum_length_words) and (
+                            minimum_length_words <= t_concat_length <= maximum_length_words) and (
+                            score_cutoff <= labse_score):
                         curr_penalty = 0
                         if s_concat_length > start_penalty_word_number:
                             curr_penalty += (s_concat_length - start_penalty_word_number) * penalty_per_word
@@ -118,7 +125,8 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
                             curr_penalty += (t_concat_length - start_penalty_word_number) * penalty_per_word
                         if total_splits - free_concats >= 0:
                             calculated_score = (total_splits - free_concats) + 1
-                            curralign_score = (((labse_score - curr_penalty) ** calculated_score) * total_splits) + best_node_score
+                            curralign_score = (((
+                                                            labse_score - curr_penalty) ** calculated_score) * total_splits) + best_node_score
                         else:
                             curralign_score = ((labse_score - curr_penalty) * total_splits) + best_node_score
                     else:
@@ -131,9 +139,9 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
                         max_path = ''
                         temp_s = ''
                         temp_t = ''
-                        for s_coordinate in range(i-m_ctr, i+1):
+                        for s_coordinate in range(i - m_ctr, i + 1):
                             temp_s += str(s_coordinate) + ','
-                        for t_coordinate in range(j-n_ctr, j+1):
+                        for t_coordinate in range(j - n_ctr, j + 1):
                             temp_t += str(t_coordinate) + ','
                         path_addition.append('[' + temp_s.strip(',') + ':' + temp_t.strip(',') + ']')
                         labse_dict['[' + temp_s.strip(',') + ':' + temp_t.strip(',') + ']'] = labse_score
@@ -141,10 +149,11 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
                         for k in path_addition:
                             max_path += str(k) + '\n'
                         best_score_array[i - (start_source)][j - (start_target)] = curralign_score
-                        best_parent_array[i - (start_source)][j - (start_target)] = (i - (start_source) - (m_ctr+1),j - (start_target) - (n_ctr+1))
+                        best_parent_array[i - (start_source)][j - (start_target)] = (
+                        i - (start_source) - (m_ctr + 1), j - (start_target) - (n_ctr + 1))
                         best_path_array[i - (start_source)][j - (start_target)] = max_path
-                    n_ctr+=1
-                m_ctr+=1
+                    n_ctr += 1
+                m_ctr += 1
             processInfo.add_nodes(end_target - start_target)
 
     goOn = True
@@ -159,7 +168,8 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
             goOn = False
 
     calculated_nodes = (end_source - start_source) * (end_target - start_target)
-    source_nulls, target_nulls, path, scores = reevaluate_path(path, src_emb_dict, trg_emb_dict, source_dict, target_dict, score_cutoff)
+    source_nulls, target_nulls, path, scores = reevaluate_path(path, src_emb_dict, trg_emb_dict, source_dict,
+                                                               target_dict, score_cutoff)
     source_nulls = list(map(int, source_nulls))
     target_nulls = list(map(int, target_nulls))
     path_ctr = 0
@@ -170,11 +180,11 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
             labse_dict[reeval_path] = 0
         path_ctr += 1
 
-
     source_nulls, target_nulls, path = check_for_nulls(path, source_nulls, target_nulls)
     source_nulls = list(map(int, source_nulls))
     target_nulls = list(map(int, target_nulls))
-    new_path, an_labse_dict = add_nulls(source_nulls, target_nulls, path, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+    new_path, an_labse_dict = add_nulls(source_nulls, target_nulls, path, src_emb_dict, trg_emb_dict, source_dict,
+                                        target_dict)
     ctr = 0
     for labse_key in an_labse_dict:
         labse_dict[labse_key] = an_labse_dict[labse_key]
@@ -182,7 +192,8 @@ def align_anchors(anchor, source_dict, target_dict, src_emb_dict, trg_emb_dict, 
         # Adding nulls
         ctr += 1
         path = new_path
-        new_path, an_labse_dict = add_nulls(source_nulls, target_nulls, path, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+        new_path, an_labse_dict = add_nulls(source_nulls, target_nulls, path, src_emb_dict, trg_emb_dict, source_dict,
+                                            target_dict)
         for labse_key in an_labse_dict:
             labse_dict[labse_key] = an_labse_dict[labse_key]
 
@@ -252,30 +263,34 @@ def add_nulls(source_nulls, target_nulls, path, src_emb_dict, trg_emb_dict, sour
             labse_value = get_labse_score(source, target, src_emb_dict, trg_emb_dict, source_dict, target_dict)
             an_labse_dict[curr_path] = labse_value
 
-            if (int(source[0])-1) in source_nulls:
-                current_source = [str(int(source[0])-1)] + source
-                current_labse_value = get_labse_score(current_source, target, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+            if (int(source[0]) - 1) in source_nulls:
+                current_source = [str(int(source[0]) - 1)] + source
+                current_labse_value = get_labse_score(current_source, target, src_emb_dict, trg_emb_dict, source_dict,
+                                                      target_dict)
                 if current_labse_value > labse_value:
                     labse_value = current_labse_value
                     best_node = '[' + ','.join(current_source) + ':' + ','.join(target) + ']'
                     an_labse_dict[best_node] = labse_value
-            if (int(target[0])-1) in target_nulls:
-                current_target = [str(int(target[0])-1)] + target
-                current_labse_value = get_labse_score(source, current_target, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+            if (int(target[0]) - 1) in target_nulls:
+                current_target = [str(int(target[0]) - 1)] + target
+                current_labse_value = get_labse_score(source, current_target, src_emb_dict, trg_emb_dict, source_dict,
+                                                      target_dict)
                 if current_labse_value > labse_value:
                     labse_value = current_labse_value
                     best_node = '[' + ','.join(source) + ':' + ','.join(current_target) + ']'
                     an_labse_dict[best_node] = labse_value
-            if (int(source[-1])+1) in source_nulls:
-                current_source = source + [str(int(source[-1])+1)]
-                current_labse_value = get_labse_score(current_source, target, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+            if (int(source[-1]) + 1) in source_nulls:
+                current_source = source + [str(int(source[-1]) + 1)]
+                current_labse_value = get_labse_score(current_source, target, src_emb_dict, trg_emb_dict, source_dict,
+                                                      target_dict)
                 if current_labse_value > labse_value:
                     labse_value = current_labse_value
                     best_node = '[' + ','.join(current_source) + ':' + ','.join(target) + ']'
                     an_labse_dict[best_node] = labse_value
-            if (int(target[-1])+1) in target_nulls:
-                current_target = target + [str(int(target[-1])+1)]
-                current_labse_value = get_labse_score(source, current_target, src_emb_dict, trg_emb_dict, source_dict, target_dict)
+            if (int(target[-1]) + 1) in target_nulls:
+                current_target = target + [str(int(target[-1]) + 1)]
+                current_labse_value = get_labse_score(source, current_target, src_emb_dict, trg_emb_dict, source_dict,
+                                                      target_dict)
                 if current_labse_value > labse_value:
                     best_node = '[' + ','.join(source) + ':' + ','.join(current_target) + ']'
                     an_labse_dict[best_node] = labse_value
@@ -368,7 +383,8 @@ def get_highest_scoring_pairs(source, target, src_emb_dict, trg_emb_dict, source
             if max_combination[1][0] > target[0]:
                 before_source = source[:source.index(max_combination[0][0])]
                 before_target = target[:target.index(max_combination[1][0])]
-                further_pairs = get_highest_scoring_pairs(before_source, before_target, src_emb_dict, trg_emb_dict, source_dict, target_dict, score_cutoff)
+                further_pairs = get_highest_scoring_pairs(before_source, before_target, src_emb_dict, trg_emb_dict,
+                                                          source_dict, target_dict, score_cutoff)
                 if len(further_pairs) > 0:
                     return_pairs = further_pairs + return_pairs
 
@@ -376,7 +392,8 @@ def get_highest_scoring_pairs(source, target, src_emb_dict, trg_emb_dict, source
             if max_combination[1][-1] < target[-1]:
                 after_source = source[source.index(max_combination[0][-1]) + 1:]
                 after_target = target[target.index(max_combination[1][-1]) + 1:]
-                further_pairs = get_highest_scoring_pairs(after_source, after_target, src_emb_dict, trg_emb_dict, source_dict, target_dict, score_cutoff)
+                further_pairs = get_highest_scoring_pairs(after_source, after_target, src_emb_dict, trg_emb_dict,
+                                                          source_dict, target_dict, score_cutoff)
                 if len(further_pairs) > 0:
                     return_pairs = return_pairs + further_pairs
     return return_pairs
@@ -396,7 +413,8 @@ def reevaluate_path(path, src_emb_dict, trg_emb_dict, source_dict, target_dict, 
         if len(source) == 1 and len(target) == 1:
             new_path += i + '\n'
         elif len(source) > 1 and len(target) > 1:
-            n_sentence_pairs = get_highest_scoring_pairs(source, target, src_emb_dict, trg_emb_dict, source_dict, target_dict, score_cutoff)
+            n_sentence_pairs = get_highest_scoring_pairs(source, target, src_emb_dict, trg_emb_dict, source_dict,
+                                                         target_dict, score_cutoff)
             if len(n_sentence_pairs) > 0:
                 n_source_notnulls = []
                 n_target_notnulls = []
@@ -490,13 +508,13 @@ def reevaluate_path(path, src_emb_dict, trg_emb_dict, source_dict, target_dict, 
 # A function that returns source language strings used for calculating the scores.
 # The function evaluates all possible concatenations at a given node.
 def concat_strings(start_node, x, max_concats, collection_length, collection_dict):
-    if x <= collection_length+start_node:
+    if x <= collection_length + start_node:
         concat_array = []
         counter_array = []
-        for i in range(max(start_node + 1,x + 1 - max_concats), x + 1):
+        for i in range(max(start_node + 1, x + 1 - max_concats), x + 1):
             current_array = []
             ctr = 0
-            for k in range(i, x+1):
+            for k in range(i, x + 1):
                 current_array.append(collection_dict[k])
                 ctr += 1
             concat_array.append(' '.join(current_array))

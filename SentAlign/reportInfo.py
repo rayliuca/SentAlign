@@ -2,6 +2,7 @@
 
 import datetime
 
+
 class ReportInfo:
     def __init__(self, starttime, total_files):
         self.starttime = starttime
@@ -27,11 +28,15 @@ class ReportInfo:
 
     def print_info(self):
         text_out = 'File: ' + str(self.input_file) + '\n' + 'File Elapsed Time: ' + str(self.file_elapsed_time) + '\n' + \
-            'Source file length: ' + str(self.source_file_length) + '\n' + \
-            'Target file length: ' + str(self.target_file_length) + '\n' + 'Nodes: ' + str(self.total_path_knots) + '\n' + \
-            'Gale-Church Elapsed Time: ' + str(self.gale_church_elapsed_time) + '\n' + 'Align Elapsed Time: ' + str(self.align_elapsed_time) + '\n' + \
-            'Calc Anchors Elapsed Time: ' + str(self.calc_anchors_elapsed_time) + '\n' + 'Greedy Algorithm Elapsed Time: ' + str(self.greedy_algorithm_elapsed_time) + '\n' + \
-            'Anchors: ' + str(self.anchors) + '\n'
+                   'Source file length: ' + str(self.source_file_length) + '\n' + \
+                   'Target file length: ' + str(self.target_file_length) + '\n' + 'Nodes: ' + str(
+            self.total_path_knots) + '\n' + \
+                   'Gale-Church Elapsed Time: ' + str(
+            self.gale_church_elapsed_time) + '\n' + 'Align Elapsed Time: ' + str(self.align_elapsed_time) + '\n' + \
+                   'Calc Anchors Elapsed Time: ' + str(
+            self.calc_anchors_elapsed_time) + '\n' + 'Greedy Algorithm Elapsed Time: ' + str(
+            self.greedy_algorithm_elapsed_time) + '\n' + \
+                   'Anchors: ' + str(self.anchors) + '\n'
         return text_out
 
     def init_file(self, input_file):
@@ -59,10 +64,8 @@ class ReportInfo:
     def set_elapsed_gale_church(self, galechurch):
         self.gale_church_elapsed_time = galechurch
 
-
     def set_elapsed_calc_labse(self, calclabse):
         self.calc_elapsed_labse = calclabse
-
 
     def set_elapsed_calc_anchors(self, calctime):
         self.calc_anchors_elapsed_time = calctime
@@ -76,7 +79,6 @@ class ReportInfo:
     def set_elapsed_greedy(self, greedytime):
         self.greedy_algorithm_elapsed_time = greedytime
 
-
     def set_elapsed_align(self, aligntime):
         self.align_elapsed_time = aligntime
 
@@ -89,7 +91,8 @@ class ReportInfo:
     def update_times(self):
         self.file_elapsed_time = datetime.datetime.now() - self.file_start_time
         self.align_elapsed_time = datetime.datetime.now() - self.align_start_time
-        self.align_estimated_time = (self.align_elapsed_time * (self.total_path_knots / self.current_path_knot)) + (self.align_start_time - self.file_start_time)
+        self.align_estimated_time = (self.align_elapsed_time * (self.total_path_knots / self.current_path_knot)) + (
+                    self.align_start_time - self.file_start_time)
         self.current_path_knot = self.current_path_knot
         self.total_path_knots = self.total_path_knots
         self.file_processing_stage = self.file_processing_stage
